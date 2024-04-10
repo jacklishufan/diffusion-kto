@@ -455,7 +455,7 @@ def parse_args(input_args=None):
         "--eval_metrics",
         type=str,
         nargs='+',
-        default= ['aesthetic','pick'],
+        default= ['pick'],
     )
     
     parser.add_argument(
@@ -505,7 +505,6 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--policy",
         type=str,
-        #choices=['aesthetic','blackwhite','gt_label_w_l','gt_label_wi_l','gt_label_w_il'],
         default='gt_label_wi_l',
         help=("dataloader"),
     )
@@ -747,13 +746,11 @@ def main(args):
         weight_dtype = torch.bfloat16
 
     # Move unet and text_encoders to device and cast to weight_dtype
-    # unet.to(accelerator.device, dtype=weight_dtype)
     vae.to(accelerator.device, dtype=torch.float32)
     text_encoder_one.to(accelerator.device, dtype=weight_dtype)
     text_encoder_two.to(accelerator.device, dtype=weight_dtype)
 
     # The VAE is always in float32 to avoid NaN losses.
-    #vae.to(accelerator.device, dtype=torch.float32)
 
     # Set up LoRA.
     if args.use_lora:
@@ -807,7 +804,6 @@ def main(args):
 
     # create custom saving & loading hooks so that `accelerator.save_state(...)` serializes in a nice format
     def save_model_hook(models, weights, output_dir):
-        #if accelerator.is_main_process:
             # there are only two options here. Either are just the unet attn processor layers
             # or there are the unet and text encoder atten layers
             if args.use_ema:
@@ -913,7 +909,7 @@ def main(args):
             data['label'] = data.split == 'exclusive_win'
         elif args.policy == 'gt_label_wi_l': # move intersection to win
             data['label'] = (data.split == 'exclusive_win')|(data.split == 'intersections')
-        elif args.policy == 'gt_label_w_il': # move intersection to win
+        elif args.policy == 'gt_label_w_il': # move intersection to lose
             data['label'] = (data.split == 'exclusive_win')
         else:
             raise NotImplemented
@@ -1004,7 +1000,7 @@ def main(args):
         if args.max_train_samples is not None:
             train_dataset = train_dataset.shuffle(seed=args.seed).select(range(args.max_train_samples))
         # Set the training transforms
-        if args.policy == 'aesthetic' or args.policy.startswith('gt_label'):
+        if args.policy.startswith('gt_label'):
             data_weights = make_weights_for_balanced_classes(train_dataset)
             data_weights = torch.tensor(data_weights)
         train_dataset = train_dataset.with_transform(preprocess_train)
@@ -1027,7 +1023,7 @@ def main(args):
             "labels":labels
         }
 
-    if args.policy == 'aesthetic' or args.policy.startswith('gt_label'):
+    if  args.policy.startswith('gt_label'):
         sampler = torch.utils.data.sampler.WeightedRandomSampler(data_weights, len(data_weights))
         sample_kwargs = dict(sampler=sampler)
     else:
@@ -1172,8 +1168,8 @@ def main(args):
                 prompt_embeds, pooled_prompt_embeds = encode_prompt(
                     [text_encoder_one, text_encoder_two], [batch["input_ids_one"], batch["input_ids_two"]]
                 )
-                prompt_embeds = prompt_embeds#.repeat(2, 1, 1)
-                pooled_prompt_embeds = pooled_prompt_embeds#.repeat(2, 1)
+                prompt_embeds = prompt_embeds
+                pooled_prompt_embeds = pooled_prompt_embeds
 
                 model_pred = unet(
                     noisy_model_input.detach(),
@@ -1197,7 +1193,7 @@ def main(args):
                 model_losses = model_losses.mean(dim=list(range(1, len(model_losses.shape))))
 
                 # For logging
-                raw_model_loss = model_losses.mean() #0.5 * (model_losses_w.mean() + model_losses_l.mean())
+                raw_model_loss = model_losses.mean() 
 
                 # Reference model predictions.
                 if args.use_lora:
@@ -1240,7 +1236,7 @@ def main(args):
                 kl_gpu = g_term.mean().detach()
                 kl = accelerator.reduce(kl_gpu,reduction='mean') 
                 kl = kl.clamp(min=0).detach()
-                g_term = g_term - kl # eq 8
+                g_term = g_term - kl 
                 label_sgn = 2 * labels - 1;
                 labels_binary = labels == 1
                 label_scale_g = label_sgn * scale_term * g_term
