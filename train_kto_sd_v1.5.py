@@ -1494,8 +1494,6 @@ def main(args):
                     if args.reference_ema and (global_step + 1) % 20 == 0:
                         reference_model.step(unet.parameters())
                     accelerator.clip_grad_norm_(params_to_optimize, args.max_grad_norm)
-                else:
-                    print("Here")
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()
