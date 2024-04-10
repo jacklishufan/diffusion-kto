@@ -15,13 +15,12 @@ We present Diffusion-KTO, a novel approach for aligning text-to-image diffusion 
 
 ## Checkpoint will be available soon
 
-## Data available at this link
+## Datasets
 
-[Huggingface](https://huggingface.co/datasets/jacklishufan/pick-a-pick-kto-processed)
+We used a processed version of [Pick-a-Pick](https://huggingface.co/datasets/yuvalkirstain/pickapic_v2) with binary label instead of pair-wise preference. The processed annotation `train_processed_v3.csv` can be found at [Huggingface](https://huggingface.co/datasets/jacklishufan/pick-a-pick-kto-processed).
 
-## Training
-### Data processing
-Please organize pick-a-pick dataset in the following manner. The `train_processed_v3.csv` can be found at hugging face.
+Please download the original Pick-a-Pick dataset and preprocessed annotation and organize the data folder in the following manner:
+
 ```
 <root of pick-a-pick>
 -train_processed_v3.csv
@@ -30,7 +29,7 @@ Please organize pick-a-pick dataset in the following manner. The `train_processe
 -- ... 
 ```
 
-## Launch Training
+## Training
 
 ``` 
 bash exps/example.sh 
