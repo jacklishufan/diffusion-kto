@@ -69,13 +69,6 @@ VALIDATION_PROMPTS = [
     "A photo of beautiful mountain with realistic sunset and blue lake, highly detailed, masterpiece",
 ]
 
-# VALIDATION_PROMPTS_V2 = [
-#     'an anime gril in front of castle',
-#     'a realistic photo of a teddy bear under the night sky',
-#     'lion roaring over the edge of an clif',
-#     'an beautiful women with black hair in a forest'
-# ]
-
 
 def import_model_class_from_model_name_or_path(
     pretrained_model_name_or_path: str, revision: str, subfolder: str = "text_encoder"
@@ -114,14 +107,8 @@ def log_validation(args, unet, vae, accelerator, weight_dtype, epoch, global_ste
         safety_checker=None,
         torch_dtype=weight_dtype,
     )
-    # if not is_final_validation:
-    #     pipeline.unet = accelerator.unwrap_model(unet)
-    # else:
-    #     pipeline.load_lora_weights(args.output_dir, weight_name="pytorch_lora_weights.safetensors")
 
     pipeline = pipeline.to(accelerator.device)
-    #pipeline.set_progress_bar_config(disable=True)
-
     # run inference
     generator = torch.Generator(device=accelerator.device).manual_seed(args.seed) if args.seed else None
     images = []
@@ -605,7 +592,7 @@ def parse_args(input_args=None):
 
 def tokenize_captions(tokenizers, examples):
     captions = []
-    caption_key = "coco_caption" if "coco_caption" in examples else "caption" # prioritize blip cap
+    caption_key = "coco_caption" if "coco_caption" in examples else "caption" 
     for idx,caption in enumerate(examples[caption_key]):
         if random.random() < args.proportion_empty_prompts:
             captions.append("")
@@ -718,7 +705,6 @@ def main(args):
             args.pretrained_model_name_or_path, args.revision
     )
     tokenizer_two = tokenizer_one
-        # import correct text encoder classes
     text_encoder_cls_two = text_encoder_cls_one
 
 
@@ -795,11 +781,8 @@ def main(args):
         )
         ema_unet = EMAModel(ema_unet.parameters(), model_cls=UNet2DConditionModel, model_config=ema_unet.config,decay=args.ema_momentum)
         ema_unet.to(accelerator.device)
-    #     print(ema_unet)
-    # print(ema_unet)
-    # return
-    # Add adapter and make sure the trainable params are in float32.
-    #reference_model.to(accelerator.device, dtype=weight_dtype)
+
+
     if args.mixed_precision == "fp16" and args.use_lora:
         for param in unet.parameters():
             # only upcast trainable parameters (LoRA) into fp32
@@ -854,7 +837,6 @@ def main(args):
         if args.use_ema:
                 load_model = EMAModel.from_pretrained(os.path.join(input_dir, "unet_ema"), UNet2DConditionModel)
                 ema_unet.load_state_dict(load_model.state_dict())
-                #ema_unet.to(accelerator.device)
                 del load_model
 
         if args.use_lora:
@@ -951,15 +933,13 @@ def main(args):
             examples["file_name"] = list([os.path.join(args.train_data_dir,x) for x in examples["file_name"]])
             return examples
         data = Dataset.from_pandas(data).map(resolve_path, batched=True)
-        #data = load_dataset('csv',ds,split='train')
         train_dataset = data
     else:
         train_dataset = load_dataset(
                 "imagefolder",
                 data_dir=args.train_data_dir,
                 cache_dir=args.cache_dir,
-        )['train']#.cast_column("image",D_Image(decode=False))
-        # breakpoint()
+        )['train']
 
     print('------------Data Loaded --------------------')
     # Preprocessing the datasets.
@@ -1079,9 +1059,6 @@ def main(args):
     unet, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
         unet, optimizer, train_dataloader, lr_scheduler
     )
-    #reference_model = reference_model.to(accelerator.device)
-    # if not args.use_lora:
-    #     reference_model = accelerator.prepare(accelerator.device)
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
     if overrode_max_train_steps:
@@ -1173,7 +1150,7 @@ def main(args):
                 bsz = latents.shape[0] #// 2
                 timesteps = torch.randint(
                     0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device, dtype=torch.long
-                )#.repeat(2)
+                )
 
                 # Add noise to the model input according to the noise magnitude at each timestep
                 # (this is the forward diffusion process)
@@ -1189,7 +1166,7 @@ def main(args):
 
                 add_time_ids = torch.cat(
                     [compute_time_ids(s, c) for s, c in zip(batch["original_sizes"], batch["crop_top_lefts"])]
-                )#.repeat(2, 1)
+                )
 
                 # Get the text embedding for conditioning
                 prompt_embeds, pooled_prompt_embeds = encode_prompt(
@@ -1198,16 +1175,10 @@ def main(args):
                 prompt_embeds = prompt_embeds#.repeat(2, 1, 1)
                 pooled_prompt_embeds = pooled_prompt_embeds#.repeat(2, 1)
 
-                # Predict the noise residual
-                # if accelerator.is_main_process:
-                #     breakpoint()
-                #print(noisy_model_input.shape,timesteps.shape,prompt_embeds.shape,pooled_prompt_embeds.shape,add_time_ids.shape)
-                added_cond_kwargs = {}
                 model_pred = unet(
                     noisy_model_input.detach(),
                     timesteps,
                     prompt_embeds,
-                    #added_cond_kwargs=added_cond_kwargs,
                 ).sample
 
                 
@@ -1224,11 +1195,9 @@ def main(args):
                 # Compute losses.
                 model_losses = F.mse_loss(model_pred.float(), target.float(), reduction="none")
                 model_losses = model_losses.mean(dim=list(range(1, len(model_losses.shape))))
-                #model_losses_w, model_losses_l = model_losses.chunk(2)
 
                 # For logging
                 raw_model_loss = model_losses.mean() #0.5 * (model_losses_w.mean() + model_losses_l.mean())
-                #model_diff = model_losses_w - model_losses_l  # These are both LBS (as is t)
 
                 # Reference model predictions.
                 if args.use_lora:
@@ -1252,10 +1221,6 @@ def main(args):
                         ).sample
                         ref_loss = F.mse_loss(ref_preds.float(), target.float(), reduction="none")
                         ref_loss = ref_loss.mean(dim=list(range(1, len(ref_loss.shape))))
-                        # if not args.use_lora:
-                        #     ref_unet.cpu()
-                        #ref_losses_w, ref_losses_l = ref_loss.chunk(2)
-                        #ref_diff = ref_losses_w - ref_losses_l
                         raw_ref_loss = ref_loss.mean()
                     if args.use_lora:
                         del ref_unet
@@ -1266,14 +1231,10 @@ def main(args):
                 # Re-enable adapters.
                 if args.use_lora:
                     accelerator.unwrap_model(unet).enable_adapters()
-                # L_KTO = w(y) (1 - h(x,y,b))
-                # Likelyhood is Gaussian, so should be propotational to  exp(- L2 / sigma^2)
-                # log pi is prop to - L2
                 policy_KL_logps = - model_losses
                 reference_KL_logps = -ref_loss
                 g_term = policy_KL_logps - reference_KL_logps
                 # Final loss.
-                #accelerator.backward(-g_term.mean())
                 scale_term = args.beta_dpo
                 labels = batch['labels']
                 kl_gpu = g_term.mean().detach()
@@ -1297,7 +1258,6 @@ def main(args):
                     raise NotImplemented
                 w_y = args.lambda_d_kto * labels_binary + args.lambda_u_kto * ~labels_binary
                 l_kto = w_y * (1 - h)
-                #l_kto_improved = w_y * torch.nn.functional.logsigmoid(-label_sgn * scale_term * g_term)
                 acc = ( label_scale_g > 0).sum().detach() / len(label_scale_g)
                 n_pos = labels_binary.sum().item()
                 n_neg = (len(labels_binary) - n_pos)
@@ -1324,7 +1284,6 @@ def main(args):
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
                     if args.use_ema and (global_step+1)% 20 == 0:
-                        #import ipdb;ipdb.set_trace()
                         ema_unet.step(unet.parameters())
                     if args.reference_ema and  (global_step+1)% 20 == 0:
                         reference_model.step(unet.parameters())
@@ -1396,7 +1355,6 @@ def main(args):
                 "n_pos":n_pos,
                 "n_neg":n_neg,
                 "acc":acc.item(),
-                #"implicit_acc": implicit_acc.detach().item(),
                 "lr": lr_scheduler.get_last_lr()[0],
             }
             progress_bar.set_postfix(**logs)
