@@ -90,8 +90,22 @@ def import_model_class_from_model_name_or_path(
         raise ValueError(f"{model_class} is not supported.")
 
 
-def log_validation(args, unet, vae, accelerator, weight_dtype, epoch, global_step, is_final_validation=False,reference_model=None,fixed_noise=None):
-    logger.info(f"Running validation... \n Generating images with prompts:\n" f" {VALIDATION_PROMPTS}.")
+def log_validation(
+    args,
+    unet,
+    vae,
+    accelerator,
+    weight_dtype,
+    epoch,
+    global_step,
+    is_final_validation=False,
+    reference_model=None,
+    fixed_noise=None,
+):
+    logger.info(
+        f"Running validation... \n Generating images with prompts:\n"
+        f" {VALIDATION_PROMPTS}."
+    )
 
     if is_final_validation:
         if args.mixed_precision == "fp16":
@@ -110,29 +124,46 @@ def log_validation(args, unet, vae, accelerator, weight_dtype, epoch, global_ste
 
     pipeline = pipeline.to(accelerator.device)
     # run inference
-    generator = torch.Generator(device=accelerator.device).manual_seed(args.seed) if args.seed else None
+    generator = (
+        torch.Generator(device=accelerator.device).manual_seed(args.seed)
+        if args.seed
+        else None
+    )
     images = []
-    context = contextlib.nullcontext() if is_final_validation else torch.cuda.amp.autocast()
+    context = (
+        contextlib.nullcontext() if is_final_validation else torch.cuda.amp.autocast()
+    )
 
-    for idx,prompt in enumerate(VALIDATION_PROMPTS):
+    for idx, prompt in enumerate(VALIDATION_PROMPTS):
         with context:
             if not args.fixed_noise:
-                image = pipeline(prompt, num_inference_steps=25, generator=generator).images[0]
+                image = pipeline(
+                    prompt, num_inference_steps=25, generator=generator
+                ).images[0]
             else:
-                image = pipeline(prompt, num_inference_steps=25, latents=fixed_noise[idx][:1].to(device=accelerator.device,dtype=weight_dtype)).images[0]
+                image = pipeline(
+                    prompt,
+                    num_inference_steps=25,
+                    latents=fixed_noise[idx][:1].to(
+                        device=accelerator.device, dtype=weight_dtype
+                    ),
+                ).images[0]
             images.append(image)
-            
+
     tracker_key = "test" if is_final_validation else "validation"
     if accelerator.is_main_process:
         for tracker in accelerator.trackers:
             if tracker.name == "tensorboard":
                 np_images = np.stack([np.asarray(img) for img in images])
-                tracker.writer.add_images(tracker_key, np_images, epoch, dataformats="NHWC")
+                tracker.writer.add_images(
+                    tracker_key, np_images, epoch, dataformats="NHWC"
+                )
             if tracker.name == "wandb":
                 tracker.log(
                     {
                         tracker_key: [
-                            wandb.Image(image, caption=f"{i}: {VALIDATION_PROMPTS[i]}") for i, image in enumerate(images)
+                            wandb.Image(image, caption=f"{i}: {VALIDATION_PROMPTS[i]}")
+                            for i, image in enumerate(images)
                         ]
                     }
                 )
@@ -144,18 +175,23 @@ def log_validation(args, unet, vae, accelerator, weight_dtype, epoch, global_ste
         else:
             pipeline.unet = accelerator.unwrap_model(reference_model)
         no_lora_images = [
-            pipeline(prompt, num_inference_steps=25, generator=generator).images[0] for prompt in VALIDATION_PROMPTS
+            pipeline(prompt, num_inference_steps=25, generator=generator).images[0]
+            for prompt in VALIDATION_PROMPTS
         ]
         if accelerator.is_main_process:
             for tracker in accelerator.trackers:
                 if tracker.name == "tensorboard":
                     np_images = np.stack([np.asarray(img) for img in no_lora_images])
-                    tracker.writer.add_images("test_without_lora", np_images, epoch, dataformats="NHWC")
+                    tracker.writer.add_images(
+                        "test_without_lora", np_images, epoch, dataformats="NHWC"
+                    )
                 if tracker.name == "wandb":
                     tracker.log(
                         {
                             "test_without_lora": [
-                                wandb.Image(image, caption=f"{i}: {VALIDATION_PROMPTS[i]}")
+                                wandb.Image(
+                                    image, caption=f"{i}: {VALIDATION_PROMPTS[i]}"
+                                )
                                 for i, image in enumerate(no_lora_images)
                             ]
                         }
@@ -239,7 +275,9 @@ def parse_args(input_args=None):
         default=None,
         help="The directory where the downloaded models and datasets will be stored.",
     )
-    parser.add_argument("--seed", type=int, default=None, help="A seed for reproducible training.")
+    parser.add_argument(
+        "--seed", type=int, default=None, help="A seed for reproducible training."
+    )
     parser.add_argument(
         "--resolution",
         type=int,
@@ -291,7 +329,7 @@ def parse_args(input_args=None):
         help=(
             "Whether to random crop the input images to the resolution. If not set, the images will be center-cropped."
         ),
-    )    
+    )
     parser.add_argument(
         "--ema_momentum",
         default=0.998,
@@ -300,9 +338,12 @@ def parse_args(input_args=None):
             "Whether to random crop the input images to the resolution. If not set, the images will be center-cropped."
         ),
     )
-    
+
     parser.add_argument(
-        "--train_batch_size", type=int, default=4, help="Batch size (per device) for the training dataloader."
+        "--train_batch_size",
+        type=int,
+        default=4,
+        help="Batch size (per device) for the training dataloader.",
     )
     parser.add_argument("--num_train_epochs", type=int, default=1)
     parser.add_argument(
@@ -353,10 +394,7 @@ def parse_args(input_args=None):
         default=1000,
         help="DPO KL Divergence penalty.",
     )
-    parser.add_argument(
-        "--use_lora",
-        action='store_true'
-    )
+    parser.add_argument("--use_lora", action="store_true")
     parser.add_argument(
         "--lambda_d_kto",
         type=float,
@@ -391,7 +429,10 @@ def parse_args(input_args=None):
         ),
     )
     parser.add_argument(
-        "--lr_warmup_steps", type=int, default=500, help="Number of steps for the warmup in the lr scheduler."
+        "--lr_warmup_steps",
+        type=int,
+        default=500,
+        help="Number of steps for the warmup in the lr scheduler.",
     )
     parser.add_argument(
         "--lr_num_cycles",
@@ -399,7 +440,12 @@ def parse_args(input_args=None):
         default=1,
         help="Number of hard resets of the lr in cosine_with_restarts scheduler.",
     )
-    parser.add_argument("--lr_power", type=float, default=1.0, help="Power factor of the polynomial scheduler.")
+    parser.add_argument(
+        "--lr_power",
+        type=float,
+        default=1.0,
+        help="Power factor of the polynomial scheduler.",
+    )
     parser.add_argument(
         "--dataloader_num_workers",
         type=int,
@@ -409,15 +455,45 @@ def parse_args(input_args=None):
         ),
     )
     parser.add_argument(
-        "--use_8bit_adam", action="store_true", help="Whether or not to use 8-bit Adam from bitsandbytes."
+        "--use_8bit_adam",
+        action="store_true",
+        help="Whether or not to use 8-bit Adam from bitsandbytes.",
     )
-    parser.add_argument("--adam_beta1", type=float, default=0.9, help="The beta1 parameter for the Adam optimizer.")
-    parser.add_argument("--adam_beta2", type=float, default=0.999, help="The beta2 parameter for the Adam optimizer.")
-    parser.add_argument("--adam_weight_decay", type=float, default=1e-2, help="Weight decay to use.")
-    parser.add_argument("--adam_epsilon", type=float, default=1e-08, help="Epsilon value for the Adam optimizer")
-    parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
-    parser.add_argument("--push_to_hub", action="store_true", help="Whether or not to push the model to the Hub.")
-    parser.add_argument("--hub_token", type=str, default=None, help="The token to use to push to the Model Hub.")
+    parser.add_argument(
+        "--adam_beta1",
+        type=float,
+        default=0.9,
+        help="The beta1 parameter for the Adam optimizer.",
+    )
+    parser.add_argument(
+        "--adam_beta2",
+        type=float,
+        default=0.999,
+        help="The beta2 parameter for the Adam optimizer.",
+    )
+    parser.add_argument(
+        "--adam_weight_decay", type=float, default=1e-2, help="Weight decay to use."
+    )
+    parser.add_argument(
+        "--adam_epsilon",
+        type=float,
+        default=1e-08,
+        help="Epsilon value for the Adam optimizer",
+    )
+    parser.add_argument(
+        "--max_grad_norm", default=1.0, type=float, help="Max gradient norm."
+    )
+    parser.add_argument(
+        "--push_to_hub",
+        action="store_true",
+        help="Whether or not to push the model to the Hub.",
+    )
+    parser.add_argument(
+        "--hub_token",
+        type=str,
+        default=None,
+        help="The token to use to push to the Model Hub.",
+    )
     parser.add_argument(
         "--hub_model_id",
         type=str,
@@ -450,14 +526,14 @@ def parse_args(input_args=None):
             ' (default), `"wandb"` and `"comet_ml"`. Use `"all"` to report to all integrations.'
         ),
     )
-    
+
     parser.add_argument(
         "--eval_metrics",
         type=str,
-        nargs='+',
-        default= ['pick'],
+        nargs="+",
+        default=["pick"],
     )
-    
+
     parser.add_argument(
         "--mixed_precision",
         type=str,
@@ -479,9 +555,16 @@ def parse_args(input_args=None):
             " 1.10.and an Nvidia Ampere GPU.  Default to  fp16 if a GPU is available else fp32."
         ),
     )
-    parser.add_argument("--local_rank", type=int, default=-1, help="For distributed training: local_rank")
     parser.add_argument(
-        "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
+        "--local_rank",
+        type=int,
+        default=-1,
+        help="For distributed training: local_rank",
+    )
+    parser.add_argument(
+        "--enable_xformers_memory_efficient_attention",
+        action="store_true",
+        help="Whether or not to use xformers.",
     )
     parser.add_argument(
         "--rank",
@@ -498,14 +581,14 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--dataloader",
         type=str,
-        choices=['default','pick'],
-        default='pick',
+        choices=["default", "pick"],
+        default="pick",
         help=("dataloader"),
     )
     parser.add_argument(
         "--policy",
         type=str,
-        default='gt_label_wi_l',
+        default="gt_label_wi_l",
         help=("dataloader"),
     )
     parser.add_argument(
@@ -514,36 +597,33 @@ def parse_args(input_args=None):
         default=0.5,
         help="postive sample ratio",
     )
-    
+
     parser.add_argument(
         "--halo",
         type=str,
-        default='sigmoid',
+        default="sigmoid",
     )
-    
+
     parser.add_argument(
         "--loss",
         type=str,
-        choices=['sft','dpo','kto','kto_gp'],
-        default='kto',
+        choices=["sft", "dpo", "kto", "kto_gp"],
+        default="kto",
         help=("dataloader"),
     )
-    
+
     parser.add_argument(
         "--train_data_dir",
         type=str,
-        default='',
+        default="",
         help=("dataloader"),
     )
-    
-    parser.add_argument(
-        "--fixed_noise",
-        action='store_true'
-    )
+
+    parser.add_argument("--fixed_noise", action="store_true")
     parser.add_argument(
         "--pick_split",
         type=str,
-        default='train',
+        default="train",
     )
     parser.add_argument(
         "--proportion_empty_prompts",
@@ -551,28 +631,25 @@ def parse_args(input_args=None):
         default=0.2,
         help="postive sample ratio",
     )
-    
+
     parser.add_argument(
         "--track_score",
         type=str,
-        choices=[None,"laion","pick"],
+        choices=[None, "laion", "pick"],
         default=None,
         help=("Track score metric for validation images"),
-    ) 
-    
+    )
+
     parser.add_argument(
         "--h_pos",
         type=float,
         default=1.0,
-       
-    ) 
+    )
     parser.add_argument(
         "--h_neg",
         type=str,
         default=1.0,
-       
-    ) 
-    
+    )
 
     if input_args is not None:
         args = parser.parse_args(input_args)
@@ -591,18 +668,26 @@ def parse_args(input_args=None):
 
 def tokenize_captions(tokenizers, examples):
     captions = []
-    caption_key = "coco_caption" if "coco_caption" in examples else "caption" 
-    for idx,caption in enumerate(examples[caption_key]):
+    caption_key = "coco_caption" if "coco_caption" in examples else "caption"
+    for idx, caption in enumerate(examples[caption_key]):
         if random.random() < args.proportion_empty_prompts:
             captions.append("")
         else:
             captions.append(caption)
 
     tokens_one = tokenizers[0](
-        captions, truncation=True, padding="max_length", max_length=tokenizers[0].model_max_length, return_tensors="pt"
+        captions,
+        truncation=True,
+        padding="max_length",
+        max_length=tokenizers[0].model_max_length,
+        return_tensors="pt",
     ).input_ids
     tokens_two = tokenizers[1](
-        captions, truncation=True, padding="max_length", max_length=tokenizers[1].model_max_length, return_tensors="pt"
+        captions,
+        truncation=True,
+        padding="max_length",
+        max_length=tokenizers[1].model_max_length,
+        return_tensors="pt",
     ).input_ids
 
     return tokens_one, tokens_two
@@ -616,47 +701,54 @@ def encode_prompt(text_encoders, text_input_ids_list):
     attention_mask = None
     prompt_embeds = text_encoders[0](text_input_ids, attention_mask=attention_mask)
     prompt_embeds = prompt_embeds[0]
-    return prompt_embeds,prompt_embeds
+    return prompt_embeds, prompt_embeds
+
 
 def rand_decision(p):
     return np.random.rand() < p
+
+
 from diffusers.training_utils import EMAModel, compute_snr
 
-def make_weights_for_balanced_classes(dataset):  
-    nclasses = 2                      
-    count = [0] * nclasses  
-    labels = []  
-    all_scores = []                                                  
-    for item in tqdm(dataset):    
-        label = int(item['label'])
-        count[label] += 1  
-        labels.append(label)                                           
-    weight_per_class = [0.] * nclasses                                      
-    N = float(sum(count))                                                   
-    for i in range(nclasses):                                                   
-        weight_per_class[i] = N/(float(count[i])+1e-9)
+
+def make_weights_for_balanced_classes(dataset):
+    nclasses = 2
+    count = [0] * nclasses
+    labels = []
+    all_scores = []
+    for item in tqdm(dataset):
+        label = int(item["label"])
+        count[label] += 1
+        labels.append(label)
+    weight_per_class = [0.0] * nclasses
+    N = float(sum(count))
+    for i in range(nclasses):
+        weight_per_class[i] = N / (float(count[i]) + 1e-9)
     weight_per_class[1] *= args.positive_ratio
-    weight_per_class[0] *= 1- args.positive_ratio                              
-    weight = [0] * len(labels)                                              
-    for idx, val in enumerate(labels):                                          
-        weight[idx] = weight_per_class[val]  
+    weight_per_class[0] *= 1 - args.positive_ratio
+    weight = [0] * len(labels)
+    for idx, val in enumerate(labels):
+        weight[idx] = weight_per_class[val]
     n_pos = sum(labels)
     n_neg = len(labels) - n_pos
     hist, bin_edges = np.histogram(all_scores)
-    hist_s =hist.sum()
-    print('---------------DEBUG DATASET INFO') 
-    print(f'label: pos {n_pos}  neg {n_neg} ({count})')
-    print(f'weight: ({weight_per_class})')
-    print(f'Distribution of scores: ')
-    for i,v in enumerate(hist):
-        print(f'({bin_edges[i],bin_edges[i+1]}) : {v} ({v/(hist_s+1e-9)}) ')
-    print('--------------------------------')                               
-    return weight                                                               
+    hist_s = hist.sum()
+    print("---------------DEBUG DATASET INFO")
+    print(f"label: pos {n_pos}  neg {n_neg} ({count})")
+    print(f"weight: ({weight_per_class})")
+    print(f"Distribution of scores: ")
+    for i, v in enumerate(hist):
+        print(f"({bin_edges[i],bin_edges[i+1]}) : {v} ({v/(hist_s+1e-9)}) ")
+    print("--------------------------------")
+    return weight
+
 
 def main(args):
     logging_dir = Path(args.output_dir, args.logging_dir)
 
-    accelerator_project_config = ProjectConfiguration(project_dir=args.output_dir, logging_dir=logging_dir)
+    accelerator_project_config = ProjectConfiguration(
+        project_dir=args.output_dir, logging_dir=logging_dir
+    )
 
     accelerator = Accelerator(
         gradient_accumulation_steps=args.gradient_accumulation_steps,
@@ -690,7 +782,9 @@ def main(args):
 
         if args.push_to_hub:
             repo_id = create_repo(
-                repo_id=args.hub_model_id or Path(args.output_dir).name, exist_ok=True, token=args.hub_token
+                repo_id=args.hub_model_id or Path(args.output_dir).name,
+                exist_ok=True,
+                token=args.hub_token,
             ).repo_id
 
     # Load the tokenizers
@@ -701,16 +795,20 @@ def main(args):
         use_fast=False,
     )
     text_encoder_cls_one = import_model_class_from_model_name_or_path(
-            args.pretrained_model_name_or_path, args.revision
+        args.pretrained_model_name_or_path, args.revision
     )
     tokenizer_two = tokenizer_one
     text_encoder_cls_two = text_encoder_cls_one
 
-
     # Load scheduler and models
-    noise_scheduler = DDPMScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
+    noise_scheduler = DDPMScheduler.from_pretrained(
+        args.pretrained_model_name_or_path, subfolder="scheduler"
+    )
     text_encoder_one = text_encoder_cls_one.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="text_encoder", revision=args.revision, variant=args.variant
+        args.pretrained_model_name_or_path,
+        subfolder="text_encoder",
+        revision=args.revision,
+        variant=args.variant,
     )
     text_encoder_two = text_encoder_one
 
@@ -726,9 +824,11 @@ def main(args):
         variant=args.variant,
     )
     unet = UNet2DConditionModel.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="unet", revision=args.revision, variant=args.variant
+        args.pretrained_model_name_or_path,
+        subfolder="unet",
+        revision=args.revision,
+        variant=args.variant,
     )
-   
 
     # We only train the additional adapter LoRA layers
     vae.requires_grad_(False)
@@ -765,20 +865,32 @@ def main(args):
         unet.add_adapter(unet_lora_config)
     else:
         reference_model = UNet2DConditionModel.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="unet", revision=args.revision, variant=args.variant
+            args.pretrained_model_name_or_path,
+            subfolder="unet",
+            revision=args.revision,
+            variant=args.variant,
         )
-        reference_model = EMAModel(reference_model.parameters(), model_cls=UNet2DConditionModel, model_config=reference_model.config,decay=args.reference_ema_momentum)#.cpu()
+        reference_model = EMAModel(
+            reference_model.parameters(),
+            model_cls=UNet2DConditionModel,
+            model_config=reference_model.config,
+            decay=args.reference_ema_momentum,
+        )  # .cpu()
     unet.train()
-    
+
     # Create EMA for the unet.
     ema_unet = None
     if args.use_ema:
         ema_unet = UNet2DConditionModel.from_pretrained(
             args.pretrained_model_name_or_path, subfolder="unet", revision=args.revision
         )
-        ema_unet = EMAModel(ema_unet.parameters(), model_cls=UNet2DConditionModel, model_config=ema_unet.config,decay=args.ema_momentum)
+        ema_unet = EMAModel(
+            ema_unet.parameters(),
+            model_cls=UNet2DConditionModel,
+            model_config=ema_unet.config,
+            decay=args.ema_momentum,
+        )
         ema_unet.to(accelerator.device)
-
 
     if args.mixed_precision == "fp16" and args.use_lora:
         for param in unet.parameters():
@@ -797,43 +909,48 @@ def main(args):
                 )
             unet.enable_xformers_memory_efficient_attention()
         else:
-            raise ValueError("xformers is not available. Make sure it is installed correctly")
+            raise ValueError(
+                "xformers is not available. Make sure it is installed correctly"
+            )
 
     if args.gradient_checkpointing:
         unet.enable_gradient_checkpointing()
 
     # create custom saving & loading hooks so that `accelerator.save_state(...)` serializes in a nice format
     def save_model_hook(models, weights, output_dir):
-            # there are only two options here. Either are just the unet attn processor layers
-            # or there are the unet and text encoder atten layers
-            if args.use_ema:
-                ema_unet.save_pretrained(os.path.join(output_dir, "unet_ema"))
+        # there are only two options here. Either are just the unet attn processor layers
+        # or there are the unet and text encoder atten layers
+        if args.use_ema:
+            ema_unet.save_pretrained(os.path.join(output_dir, "unet_ema"))
 
-            if not args.use_lora:
-                for i, model in enumerate(models):
-                    model.save_pretrained(os.path.join(output_dir, "unet"))
-                return
-            unet_lora_layers_to_save = None
-            models = [accelerator.unwrap_model(x) for x in models]
-            for model in models:
-                if isinstance(model, type(accelerator.unwrap_model(unet))):
-                    unet_lora_layers_to_save = convert_state_dict_to_diffusers(get_peft_model_state_dict(model))
-                else:
-                    raise ValueError(f"unexpected save model: {model.__class__}")
+        if not args.use_lora:
+            for i, model in enumerate(models):
+                model.save_pretrained(os.path.join(output_dir, "unet"))
+            return
+        unet_lora_layers_to_save = None
+        models = [accelerator.unwrap_model(x) for x in models]
+        for model in models:
+            if isinstance(model, type(accelerator.unwrap_model(unet))):
+                unet_lora_layers_to_save = convert_state_dict_to_diffusers(
+                    get_peft_model_state_dict(model)
+                )
+            else:
+                raise ValueError(f"unexpected save model: {model.__class__}")
 
-                # make sure to pop weight so that corresponding model is not saved again
-                try:
-                    weights.pop()
-                except:
-                    pass
-
+            # make sure to pop weight so that corresponding model is not saved again
+            try:
+                weights.pop()
+            except:
+                pass
 
     def load_model_hook(models, input_dir):
         unet_ = None
         if args.use_ema:
-                load_model = EMAModel.from_pretrained(os.path.join(input_dir, "unet_ema"), UNet2DConditionModel)
-                ema_unet.load_state_dict(load_model.state_dict())
-                del load_model
+            load_model = EMAModel.from_pretrained(
+                os.path.join(input_dir, "unet_ema"), UNet2DConditionModel
+            )
+            ema_unet.load_state_dict(load_model.state_dict())
+            del load_model
 
         if args.use_lora:
             raise NotImplementedError
@@ -844,11 +961,14 @@ def main(args):
                 model = models.pop()
 
                 # load diffusers style into model
-                load_model = UNet2DConditionModel.from_pretrained(input_dir, subfolder="unet")
+                load_model = UNet2DConditionModel.from_pretrained(
+                    input_dir, subfolder="unet"
+                )
                 model.register_to_config(**load_model.config)
 
                 model.load_state_dict(load_model.state_dict())
                 del load_model
+
     accelerator.register_save_state_pre_hook(save_model_hook)
     accelerator.register_load_state_pre_hook(load_model_hook)
 
@@ -859,7 +979,10 @@ def main(args):
 
     if args.scale_lr:
         args.learning_rate = (
-            args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * accelerator.num_processes
+            args.learning_rate
+            * args.gradient_accumulation_steps
+            * args.train_batch_size
+            * accelerator.num_processes
         )
 
     # Use 8-bit Adam for lower memory usage or to fine-tune the model in 16GB GPUs
@@ -886,61 +1009,83 @@ def main(args):
     )
 
     # Dataset and DataLoaders creation:
-    print('------------ Data Init --------------------')
+    print("------------ Data Init --------------------")
     if not args.train_data_dir:
         train_dataset = load_dataset(
             args.dataset_name,
             cache_dir=args.cache_dir,
             split=args.dataset_split_name,
         )
-    elif args.dataloader == 'pick':
+    elif args.dataloader == "pick":
         from datasets import Dataset
+
         pick_split = args.pick_split
-        assert os.path.exists(ds:=os.path.join(args.train_data_dir,f'{pick_split}_processed_v3.csv')),f"unknown split {pick_split}"
+        assert os.path.exists(
+            ds := os.path.join(args.train_data_dir, f"{pick_split}_processed_v3.csv")
+        ), f"unknown split {pick_split}"
         data = pd.read_csv(ds)
         data.caption = data.caption.fillna("")
 
         def resolve_path(examples):
-            examples["file_name"] = list([os.path.join(args.train_data_dir,x) for x in examples["file_name"]])
+            examples["file_name"] = list(
+                [os.path.join(args.train_data_dir, x) for x in examples["file_name"]]
+            )
             return examples
 
-        if args.policy == 'gt_label_w_l':
-            data = data[~(data.split=='intersections')]
-            data['label'] = data.split == 'exclusive_win'
-        elif args.policy == 'gt_label_wi_l': # move intersection to win
-            data['label'] = (data.split == 'exclusive_win')|(data.split == 'intersections')
-        elif args.policy == 'gt_label_w_il': # move intersection to lose
-            data['label'] = (data.split == 'exclusive_win')
+        if args.policy == "gt_label_w_l":
+            data = data[~(data.split == "intersections")]
+            data["label"] = data.split == "exclusive_win"
+        elif args.policy == "gt_label_wi_l":  # move intersection to win
+            data["label"] = (data.split == "exclusive_win") | (
+                data.split == "intersections"
+            )
+        elif args.policy == "gt_label_w_il":  # move intersection to lose
+            data["label"] = data.split == "exclusive_win"
         else:
             raise NotImplemented
 
-        print(f'--------------pick a pick policy: {args.policy}')
-        num_wins = data['label'].sum()
-        print("wins: {} loses: {} total: {}".format(num_wins,len(data)-num_wins,len(data)))
-        print('-----------------------------------')
+        print(f"--------------pick a pick policy: {args.policy}")
+        num_wins = data["label"].sum()
+        print(
+            "wins: {} loses: {} total: {}".format(
+                num_wins, len(data) - num_wins, len(data)
+            )
+        )
+        print("-----------------------------------")
         data = Dataset.from_pandas(data).map(resolve_path, batched=True)
         train_dataset = data
 
-    elif os.path.exists(os.path.join(args.train_data_dir,'metadata.csv')):
-        ds = os.path.join(args.train_data_dir,'metadata.csv')
+    elif os.path.exists(os.path.join(args.train_data_dir, "metadata.csv")):
+        ds = os.path.join(args.train_data_dir, "metadata.csv")
         from datasets import Dataset
+
         data = pd.read_csv(ds)
+
         def resolve_path(examples):
-            examples["file_name"] = list([os.path.join(args.train_data_dir,x) for x in examples["file_name"]])
+            examples["file_name"] = list(
+                [os.path.join(args.train_data_dir, x) for x in examples["file_name"]]
+            )
             return examples
+
         data = Dataset.from_pandas(data).map(resolve_path, batched=True)
         train_dataset = data
     else:
         train_dataset = load_dataset(
-                "imagefolder",
-                data_dir=args.train_data_dir,
-                cache_dir=args.cache_dir,
-        )['train']
+            "imagefolder",
+            data_dir=args.train_data_dir,
+            cache_dir=args.cache_dir,
+        )["train"]
 
-    print('------------Data Loaded --------------------')
+    print("------------Data Loaded --------------------")
     # Preprocessing the datasets.
-    train_resize = transforms.Resize(args.resolution, interpolation=transforms.InterpolationMode.BILINEAR)
-    train_crop = transforms.RandomCrop(args.resolution) if args.random_crop else transforms.CenterCrop(args.resolution)
+    train_resize = transforms.Resize(
+        args.resolution, interpolation=transforms.InterpolationMode.BILINEAR
+    )
+    train_crop = (
+        transforms.RandomCrop(args.resolution)
+        if args.random_crop
+        else transforms.CenterCrop(args.resolution)
+    )
     train_flip = transforms.RandomHorizontalFlip(p=1.0)
     to_tensor = transforms.ToTensor()
     normalize = transforms.Normalize([0.5], [0.5])
@@ -950,18 +1095,17 @@ def main(args):
         try:
             images = [img.convert("RGB") for img in examples["image"]]
         except:
-                images = [Image.open(img).convert("RGB") for img in examples["file_name"]]
+            images = [Image.open(img).convert("RGB") for img in examples["file_name"]]
         original_sizes = [(image.height, image.width) for image in images]
         crop_top_lefts = []
         pixel_values = [to_tensor(image) for image in images]
         combined_pixel_values = []
         all_labels = []
-        for idx,img in enumerate(pixel_values):
-            if args.policy.startswith('gt_label'):
-                label = examples['label'][idx]
+        for idx, img in enumerate(pixel_values):
+            if args.policy.startswith("gt_label"):
+                label = examples["label"][idx]
             else:
                 raise NotImplementedError
-                
 
             all_labels.append(label)
 
@@ -974,7 +1118,9 @@ def main(args):
                 x1 = max(0, int(round((combined_im.shape[2] - args.resolution) / 2.0)))
                 combined_im = train_crop(combined_im)
             else:
-                y1, x1, h, w = train_crop.get_params(combined_im, (args.resolution, args.resolution))
+                y1, x1, h, w = train_crop.get_params(
+                    combined_im, (args.resolution, args.resolution)
+                )
                 combined_im = crop(combined_im, y1, x1, h, w)
 
             # Flipping.
@@ -990,17 +1136,21 @@ def main(args):
         examples["pixel_values"] = combined_pixel_values
         examples["original_sizes"] = original_sizes
         examples["crop_top_lefts"] = crop_top_lefts
-        examples['labels'] = all_labels
-        tokens_one, tokens_two = tokenize_captions([tokenizer_one, tokenizer_two], examples)
+        examples["labels"] = all_labels
+        tokens_one, tokens_two = tokenize_captions(
+            [tokenizer_one, tokenizer_two], examples
+        )
         examples["input_ids_one"] = tokens_one
         examples["input_ids_two"] = tokens_two
         return examples
 
     with accelerator.main_process_first():
         if args.max_train_samples is not None:
-            train_dataset = train_dataset.shuffle(seed=args.seed).select(range(args.max_train_samples))
+            train_dataset = train_dataset.shuffle(seed=args.seed).select(
+                range(args.max_train_samples)
+            )
         # Set the training transforms
-        if args.policy.startswith('gt_label'):
+        if args.policy.startswith("gt_label"):
             data_weights = make_weights_for_balanced_classes(train_dataset)
             data_weights = torch.tensor(data_weights)
         train_dataset = train_dataset.with_transform(preprocess_train)
@@ -1020,14 +1170,18 @@ def main(args):
             "input_ids_two": input_ids_two,
             "original_sizes": original_sizes,
             "crop_top_lefts": crop_top_lefts,
-            "labels":labels
+            "labels": labels,
         }
 
-    if  args.policy.startswith('gt_label'):
-        sampler = torch.utils.data.sampler.WeightedRandomSampler(data_weights, len(data_weights))
+    if args.policy.startswith("gt_label"):
+        sampler = torch.utils.data.sampler.WeightedRandomSampler(
+            data_weights, len(data_weights)
+        )
         sample_kwargs = dict(sampler=sampler)
     else:
-        sample_kwargs = dict(shuffle=True,)
+        sample_kwargs = dict(
+            shuffle=True,
+        )
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=args.train_batch_size,
@@ -1038,7 +1192,9 @@ def main(args):
 
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+    num_update_steps_per_epoch = math.ceil(
+        len(train_dataloader) / args.gradient_accumulation_steps
+    )
     if args.max_train_steps is None:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
         overrode_max_train_steps = True
@@ -1056,7 +1212,9 @@ def main(args):
         unet, optimizer, train_dataloader, lr_scheduler
     )
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+    num_update_steps_per_epoch = math.ceil(
+        len(train_dataloader) / args.gradient_accumulation_steps
+    )
     if overrode_max_train_steps:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
     # Afterwards we recalculate our number of training epochs
@@ -1068,14 +1226,20 @@ def main(args):
         accelerator.init_trackers(args.tracker_name, config=vars(args))
 
     # Train!
-    total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
+    total_batch_size = (
+        args.train_batch_size
+        * accelerator.num_processes
+        * args.gradient_accumulation_steps
+    )
 
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(train_dataset)}")
     logger.info(f"  Num batches each epoch = {len(train_dataloader)}")
     logger.info(f"  Num Epochs = {args.num_train_epochs}")
     logger.info(f"  Instantaneous batch size per device = {args.train_batch_size}")
-    logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
+    logger.info(
+        f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}"
+    )
     logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
     global_step = 0
@@ -1122,12 +1286,18 @@ def main(args):
             with accelerator.accumulate(unet):
                 # (batch_size, 2*channels, h, w) -> (2*batch_size, channels, h, w)
                 pixel_values = batch["pixel_values"].to(dtype=vae.dtype)
-                feed_pixel_values =  pixel_values #torch.cat(pixel_values.chunk(2, dim=1))
+                feed_pixel_values = (
+                    pixel_values  # torch.cat(pixel_values.chunk(2, dim=1))
+                )
 
                 latents = []
-                for i in range(0, feed_pixel_values.shape[0], args.vae_encode_batch_size):
+                for i in range(
+                    0, feed_pixel_values.shape[0], args.vae_encode_batch_size
+                ):
                     latents.append(
-                        vae.encode(feed_pixel_values[i : i + args.vae_encode_batch_size]).latent_dist.sample()
+                        vae.encode(
+                            feed_pixel_values[i : i + args.vae_encode_batch_size]
+                        ).latent_dist.sample()
                     )
                 latents = torch.cat(latents, dim=0)
                 latents = latents * vae.config.scaling_factor
@@ -1135,17 +1305,26 @@ def main(args):
                     latents = latents.to(weight_dtype)
                 if not args.use_lora:
                     latents.to(weight_dtype)
-                    
+
                 latents = latents.detach()
                 # Sample noise that we'll add to the latents
-                noise = torch.randn_like(latents)#.chunk(2)[0]#.repeat(2, 1, 1, 1)
+                noise = torch.randn_like(latents)  # .chunk(2)[0]#.repeat(2, 1, 1, 1)
                 if fixed_noise is None:
-                    fixed_noise =  list([torch.randn_like(latents).detach().cpu() for _ in VALIDATION_PROMPTS])
+                    fixed_noise = list(
+                        [
+                            torch.randn_like(latents).detach().cpu()
+                            for _ in VALIDATION_PROMPTS
+                        ]
+                    )
 
                 # Sample a random timestep for each image
-                bsz = latents.shape[0] #// 2
+                bsz = latents.shape[0]  # // 2
                 timesteps = torch.randint(
-                    0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device, dtype=torch.long
+                    0,
+                    noise_scheduler.config.num_train_timesteps,
+                    (bsz,),
+                    device=latents.device,
+                    dtype=torch.long,
                 )
 
                 # Add noise to the model input according to the noise magnitude at each timestep
@@ -1155,18 +1334,28 @@ def main(args):
                 # time ids
                 def compute_time_ids(original_size, crops_coords_top_left):
                     target_size = (args.resolution, args.resolution)
-                    add_time_ids = list(original_size + crops_coords_top_left + target_size)
+                    add_time_ids = list(
+                        original_size + crops_coords_top_left + target_size
+                    )
                     add_time_ids = torch.tensor([add_time_ids])
-                    add_time_ids = add_time_ids.to(accelerator.device, dtype=weight_dtype)
+                    add_time_ids = add_time_ids.to(
+                        accelerator.device, dtype=weight_dtype
+                    )
                     return add_time_ids
 
                 add_time_ids = torch.cat(
-                    [compute_time_ids(s, c) for s, c in zip(batch["original_sizes"], batch["crop_top_lefts"])]
+                    [
+                        compute_time_ids(s, c)
+                        for s, c in zip(
+                            batch["original_sizes"], batch["crop_top_lefts"]
+                        )
+                    ]
                 )
 
                 # Get the text embedding for conditioning
                 prompt_embeds, pooled_prompt_embeds = encode_prompt(
-                    [text_encoder_one, text_encoder_two], [batch["input_ids_one"], batch["input_ids_two"]]
+                    [text_encoder_one, text_encoder_two],
+                    [batch["input_ids_one"], batch["input_ids_two"]],
                 )
                 prompt_embeds = prompt_embeds
                 pooled_prompt_embeds = pooled_prompt_embeds
@@ -1177,23 +1366,26 @@ def main(args):
                     prompt_embeds,
                 ).sample
 
-                
-                
-
                 # Get the target for loss depending on the prediction type
                 if noise_scheduler.config.prediction_type == "epsilon":
                     target = noise
                 elif noise_scheduler.config.prediction_type == "v_prediction":
                     target = noise_scheduler.get_velocity(latents, noise, timesteps)
                 else:
-                    raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
+                    raise ValueError(
+                        f"Unknown prediction type {noise_scheduler.config.prediction_type}"
+                    )
 
                 # Compute losses.
-                model_losses = F.mse_loss(model_pred.float(), target.float(), reduction="none")
-                model_losses = model_losses.mean(dim=list(range(1, len(model_losses.shape))))
+                model_losses = F.mse_loss(
+                    model_pred.float(), target.float(), reduction="none"
+                )
+                model_losses = model_losses.mean(
+                    dim=list(range(1, len(model_losses.shape)))
+                )
 
                 # For logging
-                raw_model_loss = model_losses.mean() 
+                raw_model_loss = model_losses.mean()
 
                 # Reference model predictions.
                 if args.use_lora:
@@ -1203,20 +1395,27 @@ def main(args):
                     reference_model.store(unet.parameters())
                     reference_model.copy_to(unet.parameters())
                     ref_unet = unet
-                if args.loss in ['sft']:
+                if args.loss in ["sft"]:
                     ref_loss = model_losses.detach()
                     raw_ref_loss = ref_loss.mean()
                 else:
                     with torch.no_grad():
-                        ref_unet.to(accelerator.device,dtype=weight_dtype)
+                        ref_unet.to(accelerator.device, dtype=weight_dtype)
                         ref_preds = ref_unet(
                             noisy_model_input.to(weight_dtype),
                             timesteps,
                             prompt_embeds,
-                            added_cond_kwargs={"time_ids": add_time_ids, "text_embeds": pooled_prompt_embeds},
+                            added_cond_kwargs={
+                                "time_ids": add_time_ids,
+                                "text_embeds": pooled_prompt_embeds,
+                            },
                         ).sample
-                        ref_loss = F.mse_loss(ref_preds.float(), target.float(), reduction="none")
-                        ref_loss = ref_loss.mean(dim=list(range(1, len(ref_loss.shape))))
+                        ref_loss = F.mse_loss(
+                            ref_preds.float(), target.float(), reduction="none"
+                        )
+                        ref_loss = ref_loss.mean(
+                            dim=list(range(1, len(ref_loss.shape)))
+                        )
                         raw_ref_loss = ref_loss.mean()
                     if args.use_lora:
                         del ref_unet
@@ -1227,61 +1426,72 @@ def main(args):
                 # Re-enable adapters.
                 if args.use_lora:
                     accelerator.unwrap_model(unet).enable_adapters()
-                policy_KL_logps = - model_losses
+                policy_KL_logps = -model_losses
                 reference_KL_logps = -ref_loss
                 g_term = policy_KL_logps - reference_KL_logps
                 # Final loss.
                 scale_term = args.beta_dpo
-                labels = batch['labels']
+                labels = batch["labels"]
                 kl_gpu = g_term.mean().detach()
-                kl = accelerator.reduce(kl_gpu,reduction='mean') 
+                kl = accelerator.reduce(kl_gpu, reduction="mean")
                 kl = kl.clamp(min=0).detach()
-                g_term = g_term - kl 
-                label_sgn = 2 * labels - 1;
+                g_term = g_term - kl
+                label_sgn = 2 * labels - 1
                 labels_binary = labels == 1
                 label_scale_g = label_sgn * scale_term * g_term
-                if args.halo == 'sigmoid':
-                    h =  torch.sigmoid(label_scale_g)
-                elif args.halo == 'loss_averse':
+                if args.halo == "sigmoid":
+                    h = torch.sigmoid(label_scale_g)
+                elif args.halo == "loss_averse":
                     h = torch.nn.functional.logsigmoid(label_scale_g)
-                elif args.halo == 'risk_seeking_1':
-                    h =  -label_sgn * torch.nn.functional.logsigmoid(-scale_term * g_term)
-                elif args.halo == 'risk_seeking_2':
-                    h =   label_sgn  * torch.exp(scale_term * g_term/100)-1
-                elif args.halo == 'risk_seeking_3':
-                    h =  -torch.nn.functional.logsigmoid(-label_scale_g)
+                elif args.halo == "risk_seeking_1":
+                    h = -label_sgn * torch.nn.functional.logsigmoid(
+                        -scale_term * g_term
+                    )
+                elif args.halo == "risk_seeking_2":
+                    h = label_sgn * torch.exp(scale_term * g_term / 100) - 1
+                elif args.halo == "risk_seeking_3":
+                    h = -torch.nn.functional.logsigmoid(-label_scale_g)
                 else:
                     raise NotImplemented
-                w_y = args.lambda_d_kto * labels_binary + args.lambda_u_kto * ~labels_binary
+                w_y = (
+                    args.lambda_d_kto * labels_binary
+                    + args.lambda_u_kto * ~labels_binary
+                )
                 l_kto = w_y * (1 - h)
-                acc = ( label_scale_g > 0).sum().detach() / len(label_scale_g)
+                acc = (label_scale_g > 0).sum().detach() / len(label_scale_g)
                 n_pos = labels_binary.sum().item()
-                n_neg = (len(labels_binary) - n_pos)
+                n_neg = len(labels_binary) - n_pos
                 with torch.no_grad():
-                    diff_pos = g_term[labels_binary].sum() / (labels_binary.sum() + 1e-6)
-                    diff_neg = g_term[~labels_binary].sum() / ((~labels_binary).sum() + 1e-6)
-                    
-                if args.loss == 'sft':
-                    loss = (model_losses * labels).mean() 
-                elif args.loss == 'cft':
+                    diff_pos = g_term[labels_binary].sum() / (
+                        labels_binary.sum() + 1e-6
+                    )
+                    diff_neg = g_term[~labels_binary].sum() / (
+                        (~labels_binary).sum() + 1e-6
+                    )
+
+                if args.loss == "sft":
+                    loss = (model_losses * labels).mean()
+                elif args.loss == "cft":
                     loss = model_losses.mean()
-                elif args.loss == 'kto':
+                elif args.loss == "kto":
                     loss = l_kto.mean()
-                elif args.loss == 'kto_gp':
-                    base_factor = (w_y*label_scale_g).mean(0,keepdim=True)
-                    base_factor_all =  accelerator.reduce(kl_gpu,reduction='mean') 
+                elif args.loss == "kto_gp":
+                    base_factor = (w_y * label_scale_g).mean(0, keepdim=True)
+                    base_factor_all = accelerator.reduce(kl_gpu, reduction="mean")
                     world_size = accelerator.num_processes
-                    inner_term = (base_factor_all - base_factor/world_size).detach() + base_factor/world_size
+                    inner_term = (
+                        base_factor_all - base_factor / world_size
+                    ).detach() + base_factor / world_size
                     h = torch.sigmoid(inner_term)
-                    l_kto = (1 - h)
+                    l_kto = 1 - h
                     loss = l_kto.mean()
                 else:
                     raise NotImplemented
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
-                    if args.use_ema and (global_step+1)% 20 == 0:
+                    if args.use_ema and (global_step + 1) % 20 == 0:
                         ema_unet.step(unet.parameters())
-                    if args.reference_ema and  (global_step+1)% 20 == 0:
+                    if args.reference_ema and (global_step + 1) % 20 == 0:
                         reference_model.step(unet.parameters())
                     accelerator.clip_grad_norm_(params_to_optimize, args.max_grad_norm)
                 else:
@@ -1300,41 +1510,63 @@ def main(args):
                         # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
                         if args.checkpoints_total_limit is not None:
                             checkpoints = os.listdir(args.output_dir)
-                            checkpoints = [d for d in checkpoints if d.startswith("checkpoint")]
-                            checkpoints = sorted(checkpoints, key=lambda x: int(x.split("-")[1]))
+                            checkpoints = [
+                                d for d in checkpoints if d.startswith("checkpoint")
+                            ]
+                            checkpoints = sorted(
+                                checkpoints, key=lambda x: int(x.split("-")[1])
+                            )
 
                             # before we save the new checkpoint, we need to have at _most_ `checkpoints_total_limit - 1` checkpoints
                             if len(checkpoints) >= args.checkpoints_total_limit:
-                                num_to_remove = len(checkpoints) - args.checkpoints_total_limit + 1
+                                num_to_remove = (
+                                    len(checkpoints) - args.checkpoints_total_limit + 1
+                                )
                                 removing_checkpoints = checkpoints[0:num_to_remove]
 
                                 logger.info(
                                     f"{len(checkpoints)} checkpoints already exist, removing {len(removing_checkpoints)} checkpoints"
                                 )
-                                logger.info(f"removing checkpoints: {', '.join(removing_checkpoints)}")
+                                logger.info(
+                                    f"removing checkpoints: {', '.join(removing_checkpoints)}"
+                                )
 
                                 for removing_checkpoint in removing_checkpoints:
-                                    removing_checkpoint = os.path.join(args.output_dir, removing_checkpoint)
+                                    removing_checkpoint = os.path.join(
+                                        args.output_dir, removing_checkpoint
+                                    )
                                     try:
                                         if os.path.exists(removing_checkpoint):
                                             shutil.rmtree(removing_checkpoint)
                                     except:
                                         pass
 
-                        save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
+                        save_path = os.path.join(
+                            args.output_dir, f"checkpoint-{global_step}"
+                        )
                         accelerator.save_state(save_path)
                         logger.info(f"Saved state to {save_path}")
 
-                    if args.run_validation and global_step % args.validation_steps == 0 or global_step==1:
+                    if (
+                        args.run_validation
+                        and global_step % args.validation_steps == 0
+                        or global_step == 1
+                    ):
                         if args.use_ema:
                             # Store the UNet parameters temporarily and load the EMA parameters to perform inference.
                             ema_unet.store(unet.parameters())
                             ema_unet.copy_to(unet.parameters())
                         if accelerator.is_main_process:
                             log_validation(
-                                args, unet=unet, vae=vae, accelerator=accelerator, weight_dtype=weight_dtype,
-                                epoch=epoch,global_step=global_step,
-                                reference_model=reference_model, fixed_noise=fixed_noise,
+                                args,
+                                unet=unet,
+                                vae=vae,
+                                accelerator=accelerator,
+                                weight_dtype=weight_dtype,
+                                epoch=epoch,
+                                global_step=global_step,
+                                reference_model=reference_model,
+                                fixed_noise=fixed_noise,
                             )
                         if args.use_ema:
                             # Store the UNet parameters temporarily and load the EMA parameters to perform inference.
@@ -1344,13 +1576,13 @@ def main(args):
                 "loss": loss.detach().item(),
                 "raw_model_loss": raw_model_loss.detach().item(),
                 "ref_loss": raw_ref_loss.detach().item(),
-                "likelyhood":g_term.detach().mean().item(),
-                "kl":kl.detach().item(),
-                "diff_pos":diff_pos.detach().item(),
-                "diff_neg":diff_neg.detach().item(),
-                "n_pos":n_pos,
-                "n_neg":n_neg,
-                "acc":acc.item(),
+                "likelyhood": g_term.detach().mean().item(),
+                "kl": kl.detach().item(),
+                "diff_pos": diff_pos.detach().item(),
+                "diff_neg": diff_neg.detach().item(),
+                "n_pos": n_pos,
+                "n_neg": n_neg,
+                "acc": acc.item(),
                 "lr": lr_scheduler.get_last_lr()[0],
             }
             progress_bar.set_postfix(**logs)
@@ -1365,7 +1597,9 @@ def main(args):
         unet = accelerator.unwrap_model(unet)
         if args.use_ema:
             ema_unet.copy_to(unet.parameters())
-        unet_lora_state_dict = convert_state_dict_to_diffusers(get_peft_model_state_dict(unet))
+        unet_lora_state_dict = convert_state_dict_to_diffusers(
+            get_peft_model_state_dict(unet)
+        )
 
         # Final validation?
         if args.run_validation:
