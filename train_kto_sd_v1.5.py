@@ -611,6 +611,14 @@ def parse_args(input_args=None):
         default="kto",
         help=("dataloader"),
     )
+    
+    parser.add_argument(
+        "--bce_offset",
+        type=str,
+        choices=["none", "sigmoid"],
+        default="none",
+        help=("dataloader"),
+    )
 
     parser.add_argument(
         "--train_data_dir",
@@ -1432,12 +1440,18 @@ def main(args):
                 # Final loss.
                 scale_term = args.beta_dpo
                 labels = batch["labels"]
-                kl_gpu = g_term.mean().detach()
-                kl = accelerator.reduce(kl_gpu, reduction="mean")
-                kl = kl.clamp(min=0).detach()
-                g_term = g_term - kl
                 label_sgn = 2 * labels - 1
                 labels_binary = labels == 1
+                kl_gpu = g_term.mean().detach()
+                if args.bce_offset == "sigmoid":
+                    kl1_gpu = (labels_binary*g_term).sum().detach() / (labels_binary.sum()+1e-6)
+                    kl2_gpu = ((~labels_binary)*g_term).sum().detach()  / ((~labels_binary).sum()+1e-6)
+                    kl1 = accelerator.reduce(kl1_gpu, reduction="mean")
+                    kl2 = accelerator.reduce(kl2_gpu, reduction="mean")
+                    kl = (kl1+kl2) / 2
+                else:
+                    kl = kl.clamp(min=0).detach()
+                g_term = g_term - kl
                 label_scale_g = label_sgn * scale_term * g_term
                 if args.halo == "sigmoid":
                     h = torch.sigmoid(label_scale_g)

@@ -13,7 +13,40 @@ This repository contains the official code and checkpoints used in the paper "[A
 We present Diffusion-KTO, a novel approach for aligning text-to-image diffusion models by formulating the alignment objective as the maximization of expected human utility. Since this objective applies to each generation independently, Diffusion-KTO does not require collecting costly pairwise preference data nor training a complex reward model. Instead, our objective requires simple per-image binary feedback signals, e.g. likes or dislikes, which are abundantly available. After fine-tuning using Diffusion-KTO, text-to-image diffusion models exhibit superior performance compared to existing techniques, including supervised fine-tuning and Diffusion-DPO, both in terms of human judgment and automatic evaluation metrics such as PickScore and ImageReward. Overall, Diffusion-KTO unlocks the potential of leveraging readily available per-image binary signals and broadens the applicability of aligning text-to-image diffusion models with human preferences.
 
 
-## Checkpoint will be available soon
+## Checkpoint
+
+SD-v1.5 HuggingFace(https://huggingface.co/jacklishufan/diffusion-kto/settings)
+
+## Usage
+```
+vae_path = model_name = "runwayml/stable-diffusion-v1-5"
+device = 'cuda'
+weight_dtype = torch.float16
+vae = AutoencoderKL.from_pretrained(
+    vae_path,
+    subfolder="vae",
+)
+unet = UNet2DConditionModel.from_pretrained(
+    "jacklishufan/diffusion-kto", subfolder="unet",
+)
+pipeline = DiffusionPipeline.from_pretrained(
+    model_name,
+    vae=vae,
+    unet=unet,
+    # torch_dtype=torch.float16,
+    device=device,
+).to(device).to(weight_dtype)
+
+
+result = pipeline(
+    prompt="Self-portrait oil painting, a beautiful cyborg with golden hair, 8k",
+    num_inference_steps=50,
+    guidance_scale=7.0
+)
+img = result[0][0]
+
+```
+
 
 ## Datasets
 
