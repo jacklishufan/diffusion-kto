@@ -34,7 +34,6 @@ pipeline = DiffusionPipeline.from_pretrained(
     model_name,
     vae=vae,
     unet=unet,
-    # torch_dtype=torch.float16,
     device=device,
 ).to(device).to(weight_dtype)
 
