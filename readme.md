@@ -19,6 +19,7 @@ SD-v1.5 HuggingFace(https://huggingface.co/jacklishufan/diffusion-kto/settings)
 
 ## Usage
 ```python
+import torch
 from diffusers import AutoencoderKL, UNet2DConditionModel, DiffusionPipeline
 vae_path = model_name = "runwayml/stable-diffusion-v1-5"
 device = 'cuda'
