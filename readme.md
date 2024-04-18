@@ -15,7 +15,7 @@ We present Diffusion-KTO, a novel approach for aligning text-to-image diffusion 
 
 ## Checkpoint
 
-SD-v1.5 HuggingFace(https://huggingface.co/jacklishufan/diffusion-kto/settings)
+SD-v1.5 HuggingFace(https://huggingface.co/jacklishufan/diffusion-kto/)
 
 ## Usage
 ```python
