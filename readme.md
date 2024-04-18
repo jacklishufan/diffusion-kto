@@ -51,12 +51,12 @@ img = result[0][0]
 
 ## Datasets
 
-We used a processed version of [Pick-a-Pick](https://huggingface.co/datasets/yuvalkirstain/pickapic_v2) with binary label instead of pair-wise preference. The processed annotation `train_processed_v3.csv` can be found at [Huggingface](https://huggingface.co/datasets/jacklishufan/pick-a-pick-kto-processed).
+We used a processed version of [Pick-a-Pic](https://huggingface.co/datasets/yuvalkirstain/pickapic_v2) with binary label instead of pair-wise preference. The processed annotation `train_processed_v3.csv` can be found at [Huggingface](https://huggingface.co/datasets/jacklishufan/pick-a-pick-kto-processed).
 
-Please download the original Pick-a-Pick dataset and preprocessed annotation and organize the data folder in the following manner:
+Please download the original Pick-a-Pic dataset and preprocessed annotation and organize the data folder in the following manner:
 
 ```
-<root of pick-a-pick>
+<root of pick-a-pic>
 -train_processed_v3.csv
 -train
 --- 17a0ce90-9e1c-4366-82c7-aa5977b06375.jpg
