@@ -62,12 +62,7 @@ check_min_version("0.25.0.dev0")
 logger = get_logger(__name__)
 
 
-VALIDATION_PROMPTS = [
-    "portrait photo of a girl, photograph, highly detailed face, depth of field, moody light, golden hour, style by Dan Winters, Russell James, Steve McCurry, centered, extremely detailed, Nikon D850, award winning photography",
-    "Self-portrait oil painting, a beautiful cyborg with golden hair, 8k",
-    "Astronaut in a jungle, cold color palette, muted colors, detailed, 8k",
-    "A photo of beautiful mountain with realistic sunset and blue lake, highly detailed, masterpiece",
-]
+VALIDATION_PROMPTS = []
 
 
 def import_model_class_from_model_name_or_path(
@@ -658,6 +653,12 @@ def parse_args(input_args=None):
         type=str,
         default=1.0,
     )
+    parser.add_argument(
+        "--validation_prompt",
+        type=str,
+        default= "portrait photo of a girl, photograph, highly detailed face, depth of field, moody light, golden hour, style by Dan Winters, Russell James, Steve McCurry, centered, extremely detailed, Nikon D850, award winning photography",
+    )
+
 
     if input_args is not None:
         args = parser.parse_args(input_args)
@@ -670,7 +671,8 @@ def parse_args(input_args=None):
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
     if env_local_rank != -1 and env_local_rank != args.local_rank:
         args.local_rank = env_local_rank
-
+    for _ in range(4):
+        VALIDATION_PROMPTS.append(args.validation_prompt)
     return args
 
 
@@ -1450,6 +1452,7 @@ def main(args):
                     kl2 = accelerator.reduce(kl2_gpu, reduction="mean")
                     kl = (kl1+kl2) / 2
                 else:
+                    kl = accelerator.reduce(kl_gpu, reduction="mean")
                     kl = kl.clamp(min=0).detach()
                 g_term = g_term - kl
                 label_scale_g = label_sgn * scale_term * g_term

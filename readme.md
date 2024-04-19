@@ -63,6 +63,26 @@ Please download the original Pick-a-Pic dataset and preprocessed annotation and 
 -- ... 
 ```
 
+## Training on Custom Data
+Please prepare a folder in the following format 
+
+```
+<root of your-dataset>
+-train_processed_v3.csv
+-train
+--- 0001.jpg
+-- ... 
+```
+
+wheere train_processed_v3.csv should contain the following columns:
+
+```
+file_path: string, relative path of image
+caption: string, prompt
+label: string, use "exclusive_win" for winning samples and "exclusive_lose" for winning samples 
+```
+
+
 ## Training
 
 ``` 
