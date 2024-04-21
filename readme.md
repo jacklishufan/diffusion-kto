@@ -2,7 +2,7 @@
 # Diffusion-KTO: Aligning Diffusion Models by Optimizing Human Utility
 
 <p align="center">
-    <img src="assets/teaser.png", width=50%> <br>
+    <img src="assets/teaser.png", width=60%> <br>
 </p>
 
 
