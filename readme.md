@@ -79,7 +79,7 @@ wheere train_processed_v3.csv should contain the following columns:
 ```
 file_path: string, relative path of image
 caption: string, prompt
-label: string, use "exclusive_win" for winning samples and "exclusive_lose" for winning samples 
+label: string, use "exclusive_win" for winning samples and "exclusive_lose" for losing samples 
 ```
 
 
