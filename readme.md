@@ -29,7 +29,7 @@ vae = AutoencoderKL.from_pretrained(
     subfolder="vae",
 )
 unet = UNet2DConditionModel.from_pretrained(
-    "jacklishufan/diffusion-kto", subfolder="unet",
+    <your checkpoint here>, subfolder="unet",
 )
 pipeline = DiffusionPipeline.from_pretrained(
     model_name,
