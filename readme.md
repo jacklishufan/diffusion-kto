@@ -15,7 +15,7 @@ We present Diffusion-KTO, a novel approach for aligning text-to-image diffusion 
 
 ## Checkpoint
 
-We have unlisted our checkpoint for the moment due to potential safety risks incurred by NSFW content in the training data (Pick-a-Pick). We will release a model after a safety review and potentially retrain the model on the filtered clean data.
+Checkpoint is available at [HuggingFace](https://huggingface.co/jacklishufan/diffusion-kto/)"
 
 ## Usage
 ```python
