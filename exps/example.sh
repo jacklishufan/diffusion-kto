@@ -9,7 +9,7 @@ accelerate launch --config_file config.json --num_processes 4 train_kto_sd_v1.5.
   --output_dir=$OUTPUT_DIR \
   --mixed_precision="fp16" \
   --dataset_name=kashif/pickascore \
-  --train_batch_size=3 \
+  --train_batch_size=2 \
   --gradient_accumulation_steps=256 \
   --gradient_checkpointing \
   --use_8bit_adam \
