@@ -610,7 +610,7 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--bce_offset",
         type=str,
-        choices=["none", "sigmoid"],
+        choices=["none", "sigmoid","original"],
         default="none",
         help=("dataloader"),
     )
@@ -1363,18 +1363,23 @@ def main(args):
                 )
 
                 # Get the text embedding for conditioning
-                prompt_embeds, pooled_prompt_embeds = encode_prompt(
+                prompt_embeds, _ = encode_prompt(
                     [text_encoder_one, text_encoder_two],
                     [batch["input_ids_one"], batch["input_ids_two"]],
                 )
-                prompt_embeds = prompt_embeds
-                pooled_prompt_embeds = pooled_prompt_embeds
 
                 model_pred = unet(
                     noisy_model_input.detach(),
                     timesteps,
                     prompt_embeds,
                 ).sample
+                if args.bce_offset == "original":
+                    with torch.no_grad():
+                        model_pred_roll = unet(
+                            noisy_model_input.detach(),
+                            timesteps,
+                            torch.roll(prompt_embeds,1,0),
+                        ).sample
 
                 # Get the target for loss depending on the prediction type
                 if noise_scheduler.config.prediction_type == "epsilon":
@@ -1393,6 +1398,9 @@ def main(args):
                 model_losses = model_losses.mean(
                     dim=list(range(1, len(model_losses.shape)))
                 )
+                if args.bce_offset == "original":
+                    model_losses_roll = F.mse_loss(model_pred_roll.float(), target.float(), reduction="none")
+                    model_losses_roll = model_losses_roll.mean(dim=list(range(1, len(model_losses_roll.shape))))
 
                 # For logging
                 raw_model_loss = model_losses.mean()
@@ -1415,10 +1423,6 @@ def main(args):
                             noisy_model_input.to(weight_dtype),
                             timesteps,
                             prompt_embeds,
-                            added_cond_kwargs={
-                                "time_ids": add_time_ids,
-                                "text_embeds": pooled_prompt_embeds,
-                            },
                         ).sample
                         ref_loss = F.mse_loss(
                             ref_preds.float(), target.float(), reduction="none"
@@ -1427,6 +1431,14 @@ def main(args):
                             dim=list(range(1, len(ref_loss.shape)))
                         )
                         raw_ref_loss = ref_loss.mean()
+                        if args.bce_offset == "original":
+                                ref_preds_roll = unet(
+                                    noisy_model_input.detach(),
+                                    timesteps,
+                                    torch.roll(prompt_embeds,1,0),
+                                ).sample
+                                ref_loss_roll = F.mse_loss(ref_preds_roll.float(), target.float(), reduction="none")
+                                ref_loss_roll = ref_loss_roll.mean(dim=list(range(1, len(ref_loss_roll.shape))))
                     if args.use_lora:
                         del ref_unet
                     else:
@@ -1451,6 +1463,9 @@ def main(args):
                     kl1 = accelerator.reduce(kl1_gpu, reduction="mean")
                     kl2 = accelerator.reduce(kl2_gpu, reduction="mean")
                     kl = (kl1+kl2) / 2
+                elif args.bce_offset == "original":
+                    kl_gpu = torch.mean(ref_loss_roll - model_losses_roll).mean().detach()
+                    kl = accelerator.reduce(kl_gpu,reduction='mean') # L781 in TPO CODe
                 else:
                     kl = accelerator.reduce(kl_gpu, reduction="mean")
                     kl = kl.clamp(min=0).detach()
