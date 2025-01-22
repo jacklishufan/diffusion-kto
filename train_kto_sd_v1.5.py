@@ -1465,7 +1465,7 @@ def main(args):
                     kl = (kl1+kl2) / 2
                 elif args.bce_offset == "original":
                     kl_gpu = torch.mean(ref_loss_roll - model_losses_roll).mean().detach()
-                    kl = accelerator.reduce(kl_gpu,reduction='mean') # L781 in TPO CODe
+                    kl = accelerator.reduce(kl_gpu,reduction='mean') # L781 in KTO CODe
                 else:
                     kl = accelerator.reduce(kl_gpu, reduction="mean")
                     kl = kl.clamp(min=0).detach()
