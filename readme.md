@@ -91,12 +91,12 @@ bash exps/example.sh
 
 ## Citation
 ```
-@misc{li2024aligning,
-      title={Aligning Diffusion Models by Optimizing Human Utility}, 
-      author={Shufan Li and Konstantinos Kallidromitis and Akash Gokul and Yusuke Kato and Kazuki Kozuka},
-      year={2024},
-      eprint={2404.04465},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV}
+@article{li2024aligning,
+  title={Aligning diffusion models by optimizing human utility},
+  author={Li, Shufan and Kallidromitis, Konstantinos and Gokul, Akash and Kato, Yusuke and Kozuka, Kazuki},
+  journal={Advances in Neural Information Processing Systems},
+  volume={37},
+  pages={24897--24925},
+  year={2024}
 }
 ```
